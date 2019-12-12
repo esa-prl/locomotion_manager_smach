@@ -1,3 +1,3 @@
 string request
 ---
-
+bool status

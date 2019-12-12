@@ -39,12 +39,12 @@ def locomotionSelectionCallback(req, stateMachine):
 
 	if req.request not in mode_names:
 		rospy.logwarn('Received illegal locomotion mode request: {}'.format(req.request))
-		return
+		return LocomotionSelectionResponse(False)
 
 	stateMachine.userdata.sm_current_state = stateMachine.userdata.sm_target_state
 	stateMachine.userdata.sm_target_state = req.request
 	stateMachine.execute()
-
+        return LocomotionSelectionResponse(True)
 
 class GuardState(smach.State):
 	def __init__(self):
