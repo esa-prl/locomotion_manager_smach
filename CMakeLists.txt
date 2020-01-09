@@ -164,6 +164,7 @@ include_directories(
  install(PROGRAMS
    scripts/locomotion_dummy_client
    scripts/locomotion_executor
+   scripts/locomotion_sm
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
