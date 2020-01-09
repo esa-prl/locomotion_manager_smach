@@ -1,0 +1,44 @@
+Bridge Setup Testing
+
+Baseline:
+Ros2 Eloquent and Ros Melodic installed via apt
+
+Steps taken:
+
+Install prerequisits for ROS2 source installation from here:
+https://index.ros.org/doc/ros2/Installation/Eloquent/Linux-Development-Setup/
+
+Installed 
+sudo apt install ros2-eloquent-launch*
+
+Run instructions how to build and source the environments from here:
+(It worked with catkin build instead of catkin_make_isolated)
+https://github.com/ros2/ros1_bridge/blob/master/doc/index.rst
+
+Three terminals are now open:
+In Ros 1 shell:
+rosrun locomotion_manager locomotion_executor.py
+
+In bridge shell:
+ros2 run ros1_bridge dynamic_bridge
+
+In ros 2 shell:
+ros2 run cli_loc mode_select 2
+
+Install this fork to get the smach-viewer running on 18.04:
+https://github.com/k-okada/executive_smach_visualization/commits/melodic-devel
+
+Thoughts on smach
++ visualisation very useful
++- inteded for high level objective planning and not as low level state machine. 
+-- not maintained
+-- no plans for porting to ROS2
+- automatically navigating the graph to go from A via B to C would be necessary.
+
+
+Thoughts on ros1_bridge:
++ bridge worked well and intuitivelly once setup. Setup is ok-ish documented -> documentation and installation issues can be resolved from our side
++ allows to use massive code base of ros1
+-- starting 4 terminals, navigating to three folders, sourcing specific files in specific orders and having to start 4 processes is big disadvantage when compared to using a single ros2 launch file. 
+
+Should be avoided in core packages and only used for niche cases, so the above mentionedoverhead is not always required

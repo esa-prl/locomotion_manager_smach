@@ -3,13 +3,10 @@
 
 """
 TODOs:
-+ Semantic:
-    - Determine what happens when calling the state we're already in
-    - Determine HALT behavior
-+ Integration:
-    - Determine naming conventions and extract names to params or launch args
-+ Internal implementation:
-    - Use the smach.ServiceState for subclassing in Reset and Locomotion (not Guard)
+- Use the smach.ServiceState for subclassing in Reset and Locomotion (not Guard)
+- Check if transition is allowed when receiving request via service before addinging it to the user data.
+- Have elegant way to manually and automatically define modes
+- rename reset node to init or similar
 """
 
 #import roslib; roslib.load_manifest('smach_tutorials');
@@ -22,62 +19,38 @@ import smach_ros
 from locomotion_manager.srv import *
 
 # Consider feeding them as configurations / launch parameters
-mode_names = ['simple','wheel_walking', 'crabkerman']
+mode_names = ['wheel_walking', 'crabkerman']
+all_mode_names = copy.copy(mode_names)
+all_mode_names.append('leveling')
+
 default_mode_name = mode_names[0]
 asn = '/{}/activate_locomotion'
 dsn = '/{}/deactivate_locomotion'
 
 # These are internal for the smach, no need to make them visible outside
-guard_name = 'guard'
-rst_name = 'reset'
+rst_name = 'init'
 
 def locomotionSelectionCallback(req, stateMachine):
     rospy.loginfo('>>> Locomotion selection request: ' + req.request)
 
-    if req.request not in mode_names:
+    if req.request not in all_mode_names:
         rospy.logwarn('Received illegal locomotion mode request: {}'.format(req.request))
         return LocomotionSelectionResponse(False)
 
-    # Pass request to currently active state.
+    active_state_name = stateMachine.get_active_states()[0]
+    active_state = stateMachine.__getitem__(active_state_name)
 
-    # stateMachine.userdata.sm_current_state = stateMachine.userdata.sm_target_state
-    stateMachine.userdata.sm_target_state = req.request
-    # stateMachine.execute()
+    registered_outcomes = active_state.get_registered_outcomes()
+
+    if 'GOTO_'+req.request in registered_outcomes:
+
+        # Pass request to currently active state.
+        stateMachine.userdata.sm_target_state = req.request
+    else:
+        rospy.logwarn('Transition from {} to {} not possible!'.format(active_state_name, req.request))
+        return LocomotionSelectionResponse(False)
+
     return LocomotionSelectionResponse(True)
-
-
-class GuardState(smach.State):
-    def __init__(self):
-        outcomes = ['GOTO_' + name for name in mode_names]
-        # CAREFUL: should RUNNING be added?
-        smach.State.__init__(
-            self,
-            outcomes=outcomes + ['RUNNING'],
-            input_keys=['current_state', 'target_state'],
-            output_keys=['current_state', 'target_state']
-        )
-    
-    def execute(self, userdata):
-        if userdata.current_state == 'INIT':
-            userdata.current_state = userdata.target_state
-            return 'GOTO_' + userdata.target_state
-        # Is this the behavior we're looking for when invoking a state
-        # we're already in? CHANGE ABOVE IF YOU CHANGE THIS!
-        elif userdata.current_state == userdata.target_state:
-            return 'RUNNING'
-        return 'GOTO_' + userdata.current_state
-
-# class LocState(smach.State):
-#   def __init(self):
-#       outcomes =  = \
-#           ['FAILURE'] + \
-#           [name for name in mode_names]
-#       smach.State.__init__(
-#           self,
-#           outcomes=outcomes,
-#           input_keys=['current_state', 'target_state'],
-#           output_keys=['current_state', 'target_state']
-#       )
 
 # Should probably subclass smach.ServiceState in a future iteration
 class ResetState(smach.State):
@@ -104,13 +77,11 @@ class ResetState(smach.State):
 # State subclass for switching locomotion modes
 # Should probably subclass smach.ServiceState in a future iteration
 class LocomotionMode(smach.State):
-    def __init__(self, stateName, rate=10):
-        outcomes = \
-            ['FAILURE'] + \
-            ['GOTO_' + name for name in mode_names]
+    def __init__(self, stateName, outcomes, rate=10):
+        self.outcomes = outcomes
         smach.State.__init__(
             self,
-            outcomes=outcomes,
+            outcomes=self.outcomes,
             input_keys=['target_state'],
             output_keys=['target_state']
         )
@@ -175,32 +146,24 @@ class LocomotionMode(smach.State):
 def internalExecution(stateMachine, targetMode):
     stateMachine.userdata.sm_current_state = stateMachine.userdata.sm_target_state
     stateMachine.userdata.sm_target_state = targetMode
+
     stateMachine.execute()
 
 
 def main():
     rospy.init_node('locomotion_manager')
 
-    sm = smach.StateMachine(outcomes=['DRIVING', 'HALTED', 'CRASHED'])
+    sm = smach.StateMachine(outcomes=['CRASHED'])
 
     with sm:
-        guard_trans = {'GOTO_'+name : name for name in mode_names}
-        rst_trans = copy.copy(guard_trans)
-        loc_trans = copy.copy(guard_trans)
-        loc_trans.update({'FAILURE': 'CRASHED'})
+        loc_trans = {'GOTO_'+name : name for name in mode_names}
+        loc_trans['FAILURE'] = 'CRASHED'
+        rst_trans = copy.copy(loc_trans)
 
 
-        # Guard state logic
-        guard_trans['RUNNING'] = 'DRIVING'  # is this needed?
-        sm.add(guard_name, GuardState(),
-            transitions = guard_trans, remapping = {
-                'current_state' : 'sm_current_state',
-                'target_state' : 'sm_target_state',
-            }
-        )
+
         
         # Reset state logic
-        rst_trans['FAILURE'] = 'CRASHED'
         sm.add(rst_name, ResetState(),
             rst_trans, remapping = {
                 'target_state' : 'sm_target_state',
@@ -208,15 +171,33 @@ def main():
         )
 
         # Mode transition logic
-        for name in mode_names:
-            sm.add(name, LocomotionMode(name, rate=1),
+        for name in mode_names: 
+            mode_trans = copy.copy(loc_trans)
+            del mode_trans['GOTO_'+name]
+            # del mode_trans['GOTO_leveling']
 
-            transitions = loc_trans
+            if name == 'wheel_walking':
+                mode_trans['GOTO_leveling'] = 'leveling'
+
+                print(mode_trans.keys())
+
+            sm.add(name, LocomotionMode(name, outcomes=mode_trans.keys(), rate=1),
+
+                transitions = mode_trans
                 , remapping = {
                     'target_state' : 'sm_target_state',
                 }
             )
     
+        lvl_outcomes = ['GOTO_wheel_walking', 'FAILURE']
+        sm.add('leveling', LocomotionMode('leveling', outcomes=lvl_outcomes, rate=1),
+            transitions = {'GOTO_wheel_walking' : 'wheel_walking',
+                            'FAILURE' : 'CRASHED'}
+            , remapping = {
+                    'target_state' : 'sm_target_state',
+                }
+            )
+
     sm.userdata.sm_target_state = 'INIT'
 
     ### DEBUGGING ONLY ###
@@ -232,9 +213,16 @@ def main():
     locomSelCb = partial(locomotionSelectionCallback, stateMachine=sm)
     srv = rospy.Service('locomotion_selection', LocomotionSelection, locomSelCb)
     rospy.loginfo('Locomotion selection service is now online!')
+
+    # Start visual server
+    sis = smach_ros.IntrospectionServer('server_name', sm, '/LOC_SM')
+    sis.start()
+
+    # Start state machine
     internalExecution(sm, default_mode_name)
 
     rospy.spin()
+    sis.stop()
 
     rospy.loginfo('Locomotioin manager shutting down...')
 
