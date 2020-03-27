@@ -1,4 +1,4 @@
-# locomotion_manager
+# locomotion_manager_smach
 
 ROS 1 package that uses the executive SMACH library to create and manage a state machine that handles locomotion mode switching.
 

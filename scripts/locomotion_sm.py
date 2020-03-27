@@ -16,7 +16,7 @@ import copy
 import rospy
 import smach
 import smach_ros
-from locomotion_manager.srv import *
+from locomotion_manager_smach.srv import *
 
 # Consider feeding them as configurations / launch parameters
 mode_names = ['wheel_walking', 'crabkerman']
@@ -151,7 +151,7 @@ def internalExecution(stateMachine, targetMode):
 
 
 def main():
-    rospy.init_node('locomotion_manager')
+    rospy.init_node('locomotion_manager_smach_node')
 
     sm = smach.StateMachine(outcomes=['CRASHED'])
 

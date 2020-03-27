@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(locomotion_manager)
+project(locomotion_manager_smach)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
