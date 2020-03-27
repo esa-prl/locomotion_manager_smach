@@ -6,7 +6,7 @@ For interoperability with ROS 2, rebuild a bridge_ws that contains the appropria
 
 ```
 -
-        ros1_package_name: 'locomotion_manager'
+        ros1_package_name: 'locomotion_manager_smach'
         ros2_package_name: 'locomotion_msgs'
 ```
 
